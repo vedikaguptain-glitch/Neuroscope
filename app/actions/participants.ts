@@ -8,6 +8,7 @@ import {
 } from "@/lib/session/participant-cookie";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getSessionSecret } from "@/lib/supabase/env";
+import { seedFromString } from "@/lib/experiment/rng";
 import type { ActionResult } from "@/lib/types/experiment";
 
 const createParticipantSchema = z.object({
@@ -70,13 +71,13 @@ export async function createParticipant(
     return { ok: false, error: "Could not create a signed session cookie." };
   }
 
-  const seed = Number.parseInt(publicId.replace(/[^0-9a-f]/gi, "").slice(0, 8), 16);
+  const seed = seedFromString(publicId);
 
   return {
     ok: true,
     data: {
       publicId,
-      seed: Number.isFinite(seed) ? seed : Date.now(),
+      seed,
     },
   };
 }
