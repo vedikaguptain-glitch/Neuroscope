@@ -1,10 +1,8 @@
 import { JsPsych, JsPsychPlugin, ParameterType, TrialType } from "jspsych";
+import type { CardSpec } from "@/lib/experiment/logic/rule-discovery";
+import { renderHtml } from "@/lib/experiment/markup";
 
-export interface CardSpec {
-  color: "red" | "green" | "blue" | "yellow";
-  shape: "triangle" | "star" | "plus" | "circle";
-  count: 1 | 2 | 3 | 4;
-}
+export type { CardSpec };
 
 const COLOR_HEX: Record<CardSpec["color"], string> = {
   red: "#ef4444",
@@ -33,9 +31,15 @@ export function renderCard(card: CardSpec): string {
   return `<div class="ns-card" data-color="${card.color}" data-shape="${card.shape}" data-count="${card.count}">${items}</div>`;
 }
 
+export interface RuleChoice {
+  response: number;
+  correct: boolean;
+  rt: number;
+}
+
 const info = {
   name: "neuroscope-rule-match",
-  version: "1.0.0",
+  version: "1.1.0",
   parameters: {
     prompt: { type: ParameterType.HTML_STRING, default: "" },
     hud_html: { type: ParameterType.HTML_STRING, default: "" },
@@ -43,6 +47,10 @@ const info = {
     options: { type: ParameterType.COMPLEX, array: true, default: [] },
     correct_index: { type: ParameterType.INT, default: 0 },
     feedback_duration: { type: ParameterType.INT, default: 700 },
+    resolve_outcome: {
+      type: ParameterType.FUNCTION,
+      default: () => ({}),
+    },
   },
   data: {
     rt: { type: ParameterType.FLOAT },
@@ -63,8 +71,8 @@ export default class RuleMatchPlugin implements JsPsychPlugin<Info> {
 
     display_element.innerHTML = `
       <div class="ns-trial">
-        ${trial.hud_html}
-        <p class="ns-prompt">${trial.prompt}</p>
+        ${renderHtml(trial.hud_html)}
+        <p class="ns-prompt">${renderHtml(trial.prompt)}</p>
         <div class="ns-wcst">
           <div class="ns-wcst-target">
             <span class="ns-option-kicker">Target</span>
@@ -89,9 +97,12 @@ export default class RuleMatchPlugin implements JsPsychPlugin<Info> {
     const start = performance.now();
     const buttons = display_element.querySelectorAll<HTMLButtonElement>("[data-index]");
     const feedback = display_element.querySelector<HTMLElement>(".ns-feedback");
+    let settled = false;
 
     buttons.forEach((button) => {
       button.addEventListener("click", () => {
+        if (settled) return;
+        settled = true;
         const response = Number(button.dataset.index);
         const rt = performance.now() - start;
         const correct = response === trial.correct_index;
@@ -104,8 +115,10 @@ export default class RuleMatchPlugin implements JsPsychPlugin<Info> {
             ? `<span class="ns-ok">Correct</span>`
             : `<span class="ns-bad">Incorrect</span>`;
         }
+        const resolver = trial.resolve_outcome as (choice: RuleChoice) => Record<string, unknown>;
+        const extra = resolver({ response, correct, rt }) ?? {};
         this.jsPsych.pluginAPI.setTimeout(() => {
-          this.jsPsych.finishTrial({ rt, response, correct });
+          this.jsPsych.finishTrial({ rt, response, correct, ...extra });
         }, trial.feedback_duration ?? 700);
       });
     });
