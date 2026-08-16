@@ -5,6 +5,15 @@ import { useRouter } from "next/navigation";
 import { initJsPsych } from "jspsych";
 import { TrialLogQueue } from "@/lib/experiment/log-queue";
 import { buildBatteryTimeline, createSessionState } from "@/lib/experiment/timeline";
+import {
+  appendDelayChoice,
+  isSessionComplete,
+  markSessionComplete,
+  readSessionPoints,
+  recordTaskTrial,
+  SESSION_KEYS,
+  writeSessionPoints,
+} from "@/lib/experiment/session-store";
 import type { TaskId } from "@/lib/types/database";
 import type { TrialLogPayload } from "@/lib/types/experiment";
 import "@/app/experiment.css";
@@ -25,15 +34,21 @@ export function JsPsychWrapper() {
   const router = useRouter();
   const hostRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
-  const [status, setStatus] = useState("Loading the task engine…");
+  const [status, setStatus] = useState("");
 
   useEffect(() => {
     if (started.current || !hostRef.current) return;
     started.current = true;
 
-    const publicId = sessionStorage.getItem("ns_public_id") ?? "unknown";
-    const seed = Number(sessionStorage.getItem("ns_seed") ?? Date.now());
-    const session = createSessionState(publicId, seed);
+    if (isSessionComplete()) {
+      router.replace("/complete");
+      return;
+    }
+
+    const publicId = sessionStorage.getItem(SESSION_KEYS.publicId) ?? "unknown";
+    const rawSeed = Number(sessionStorage.getItem(SESSION_KEYS.seed));
+    const seed = Number.isFinite(rawSeed) ? rawSeed : Date.now();
+    const session = createSessionState(publicId, seed, readSessionPoints());
     const queue = new TrialLogQueue();
     const host = hostRef.current;
 
@@ -52,10 +67,13 @@ export function JsPsychWrapper() {
         const record = data as Record<string, unknown>;
         if (record.loggable !== true || !isTaskId(record.task_id)) return;
 
+        const taskTrialIndex = Number(record.task_trial_index);
+        if (!Number.isInteger(taskTrialIndex) || taskTrialIndex < 1) return;
+
         const payload: TrialLogPayload = {
           id: crypto.randomUUID(),
           task_id: record.task_id,
-          trial_index: Number(record.trial_index ?? 0),
+          trial_index: taskTrialIndex,
           state_vector: (record.state_vector as Record<string, unknown>) ?? {},
           action_taken: String(record.action_taken ?? record.response ?? ""),
           reward_received: (record.reward_received as Record<string, unknown>) ?? {},
@@ -64,21 +82,29 @@ export function JsPsychWrapper() {
         };
 
         if (!payload.action_taken) return;
-        sessionStorage.setItem("ns_points", String(session.points));
+        writeSessionPoints(session.points);
+        recordTaskTrial(payload.task_id, payload.trial_index);
+        if (payload.task_id === "delay_disc") {
+          appendDelayChoice(payload.action_taken === "delayed");
+        }
         queue.enqueue(payload);
       },
       on_finish: async () => {
         window.removeEventListener("beforeunload", onLeave);
         setStatus("Saving remaining trials…");
-        sessionStorage.setItem("ns_points", String(session.points));
-        sessionStorage.setItem("ns_failed_logs", String(queue.failures));
+        writeSessionPoints(session.points);
+        markSessionComplete();
+        sessionStorage.setItem(SESSION_KEYS.failedLogs, String(queue.failures));
         await queue.drain();
+        sessionStorage.setItem(SESSION_KEYS.failedLogs, String(queue.failures));
+        if (queue.pending > 0) {
+          sessionStorage.setItem(SESSION_KEYS.failedLogs, String(queue.failures + queue.pending));
+        }
         router.replace("/complete");
       },
     });
 
-    setStatus("");
-        void jsPsych.run(buildBatteryTimeline(session) as never);
+    void jsPsych.run(buildBatteryTimeline(session) as never);
 
     return () => {
       window.removeEventListener("beforeunload", onLeave);

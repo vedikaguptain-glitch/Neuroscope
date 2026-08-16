@@ -9,6 +9,7 @@ import {
   EDUCATION_LABELS,
   EDUCATION_LEVELS,
 } from "@/lib/constants";
+import { clearExperimentSession, SESSION_KEYS } from "@/lib/experiment/session-store";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -62,9 +63,10 @@ export function ConsentForm() {
         return;
       }
 
-      sessionStorage.setItem("ns_public_id", result.data.publicId);
-      sessionStorage.setItem("ns_seed", String(result.data.seed));
-      sessionStorage.setItem("ns_points", "0");
+      clearExperimentSession();
+      sessionStorage.setItem(SESSION_KEYS.publicId, result.data.publicId);
+      sessionStorage.setItem(SESSION_KEYS.seed, String(result.data.seed));
+      sessionStorage.setItem(SESSION_KEYS.points, "0");
       router.push("/experiment");
     });
   }
