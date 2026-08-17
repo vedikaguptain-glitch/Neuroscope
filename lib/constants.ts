@@ -59,7 +59,7 @@ export const COMPREHENSION_ITEMS = [
   },
   {
     id: "anonymous",
-    prompt: "Your responses are stored with an anonymous ID, not your name.",
+    prompt: "Your name is stored with this session, and each trial is tagged with a participant ID.",
     correct: true,
   },
   {

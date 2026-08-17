@@ -19,6 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
@@ -33,6 +34,7 @@ export function ConsentForm() {
   const [answers, setAnswers] = useState<Answers>(() =>
     Object.fromEntries(COMPREHENSION_ITEMS.map((item) => [item.id, null])),
   );
+  const [participantName, setParticipantName] = useState("");
   const [ageBracket, setAgeBracket] = useState("");
   const [educationLevel, setEducationLevel] = useState("");
   const [guardianConsent, setGuardianConsent] = useState(false);
@@ -51,6 +53,7 @@ export function ConsentForm() {
     setError(null);
     startTransition(async () => {
       const result = await createParticipant({
+        name: participantName.trim(),
         ageBracket,
         educationLevel,
         comprehensionPassed: true,
@@ -94,7 +97,7 @@ export function ConsentForm() {
               <li>You will complete five modules without returning to a menu.</li>
               <li>Every choice is logged immediately (state, action, reward, RT).</li>
               <li>You may stop at any time by closing the browser.</li>
-              <li>No names or contact details are collected.</li>
+              <li>Your name is stored with this session so researchers can identify your data.</li>
             </ul>
             <label className="flex items-start gap-3 text-foreground">
               <Checkbox
@@ -153,6 +156,17 @@ export function ConsentForm() {
         {step === 2 ? (
           <div className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="participant-name">What is your name?</Label>
+              <Input
+                id="participant-name"
+                autoComplete="name"
+                maxLength={100}
+                placeholder="Enter your full name"
+                value={participantName}
+                onChange={(event) => setParticipantName(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="age">What is your age?</Label>
               <NativeSelect
                 id="age"
@@ -203,6 +217,7 @@ export function ConsentForm() {
                 size="lg"
                 disabled={
                   pending ||
+                  !participantName.trim() ||
                   !ageBracket ||
                   !educationLevel ||
                   (ageBracket === "13-17" && !guardianConsent)
