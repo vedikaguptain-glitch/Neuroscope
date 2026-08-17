@@ -6,6 +6,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.participants (
   id uuid primary key default gen_random_uuid(),
   participant_id text not null unique,
+  name text not null,
   age_bracket text not null,
   education_level text not null,
   session_start_timestamp timestamptz not null default now(),
@@ -56,6 +57,13 @@ create index if not exists trials_participant_created_idx
 
 create index if not exists trials_task_id_idx
   on public.trials (task_id);
+
+-- Existing projects that already ran an older setup.sql.
+alter table public.participants
+  add column if not exists name text not null default 'Unknown';
+
+alter table public.participants
+  alter column name drop default;
 
 alter table public.participants enable row level security;
 alter table public.trials enable row level security;
