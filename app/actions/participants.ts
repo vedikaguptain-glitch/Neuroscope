@@ -12,6 +12,7 @@ import { seedFromString } from "@/lib/experiment/rng";
 import type { ActionResult } from "@/lib/types/experiment";
 
 const createParticipantSchema = z.object({
+  name: z.string().trim().min(1).max(100),
   ageBracket: z.enum(AGE_BRACKETS),
   educationLevel: z.enum(EDUCATION_LEVELS),
   comprehensionPassed: z.literal(true),
@@ -24,7 +25,7 @@ export async function createParticipant(
 ): Promise<ActionResult<{ publicId: string; seed: number }>> {
   const parsed = createParticipantSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: "Please complete consent, comprehension, and demographics." };
+    return { ok: false, error: "Please complete consent, comprehension, name, and demographics." };
   }
 
   if (parsed.data.ageBracket === "13-17" && !parsed.data.guardianConsent) {
@@ -56,6 +57,7 @@ export async function createParticipant(
   const { error } = await supabase.from("participants").insert({
     id,
     participant_id: publicId,
+    name: parsed.data.name,
     age_bracket: parsed.data.ageBracket,
     education_level: parsed.data.educationLevel,
     session_start_timestamp: sessionStart,
