@@ -87,6 +87,7 @@ export default class UltimatumPlugin implements JsPsychPlugin<Info> {
     const complete = (payload: UltimatumResult, html: string) => {
       if (settled) return;
       settled = true;
+      const rt = performance.now() - start;
       const resolver = trial.resolve_outcome as (
         result: UltimatumResult,
       ) => Record<string, unknown>;
@@ -97,7 +98,7 @@ export default class UltimatumPlugin implements JsPsychPlugin<Info> {
       }
       this.jsPsych.pluginAPI.setTimeout(() => {
         this.jsPsych.finishTrial({
-          rt: performance.now() - start,
+          rt,
           ...payload,
           ...extra,
         });
