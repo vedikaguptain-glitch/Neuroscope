@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { SESSION_KEYS } from "@/lib/experiment/session-store";
+import { readSessionItem, SESSION_KEYS } from "@/lib/experiment/session-store";
 
 function subscribe() {
   return () => undefined;
@@ -18,7 +18,7 @@ function subscribe() {
 function useSessionValue(key: string, fallback: string) {
   return useSyncExternalStore(
     subscribe,
-    () => sessionStorage.getItem(key) ?? fallback,
+    () => readSessionItem(key) ?? fallback,
     () => fallback,
   );
 }

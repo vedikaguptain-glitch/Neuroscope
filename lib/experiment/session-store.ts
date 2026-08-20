@@ -1,3 +1,5 @@
+import { seedFromString } from "@/lib/experiment/rng";
+
 const PREFIX = "ns_";
 
 export const SESSION_KEYS = {
@@ -11,17 +13,56 @@ export const SESSION_KEYS = {
   completed: `${PREFIX}completed`,
 } as const;
 
-export function getSessionStorage(): Storage | null {
+function storageOf(kind: "session" | "local"): Storage | null {
   try {
     if (typeof window === "undefined") return null;
-    return window.sessionStorage;
+    return kind === "session" ? window.sessionStorage : window.localStorage;
   } catch {
     return null;
   }
 }
 
+export function getSessionStorage(): Storage | null {
+  return storageOf("session");
+}
+
+function getLocalStorage(): Storage | null {
+  return storageOf("local");
+}
+
+function writeBoth(key: string, value: string): void {
+  getSessionStorage()?.setItem(key, value);
+  getLocalStorage()?.setItem(key, value);
+}
+
+function removeBoth(key: string): void {
+  getSessionStorage()?.removeItem(key);
+  getLocalStorage()?.removeItem(key);
+}
+
+export function readSessionItem(key: string): string | null {
+  const session = getSessionStorage();
+  const local = getLocalStorage();
+  const fromSession = session?.getItem(key);
+  if (fromSession != null) {
+    if (local?.getItem(key) !== fromSession) {
+      local?.setItem(key, fromSession);
+    }
+    return fromSession;
+  }
+  const fromLocal = local?.getItem(key) ?? null;
+  if (fromLocal != null) {
+    session?.setItem(key, fromLocal);
+  }
+  return fromLocal;
+}
+
+export function writeSessionItem(key: string, value: string): void {
+  writeBoth(key, value);
+}
+
 export function readJson<T>(key: string, fallback: T): T {
-  const raw = getSessionStorage()?.getItem(key);
+  const raw = readSessionItem(key);
   if (!raw) return fallback;
   try {
     return JSON.parse(raw) as T;
@@ -31,7 +72,29 @@ export function readJson<T>(key: string, fallback: T): T {
 }
 
 export function writeJson(key: string, value: unknown): void {
-  getSessionStorage()?.setItem(key, JSON.stringify(value));
+  writeSessionItem(key, JSON.stringify(value));
+}
+
+export function writeSessionIdentity(publicId: string, seed: number): void {
+  writeSessionItem(SESSION_KEYS.publicId, publicId);
+  writeSessionItem(SESSION_KEYS.seed, String(seed));
+}
+
+export function readPublicId(): string {
+  return readSessionItem(SESSION_KEYS.publicId) ?? "unknown";
+}
+
+export function readSessionSeed(publicId: string): number {
+  const raw = readSessionItem(SESSION_KEYS.seed);
+  if (raw != null && raw !== "") {
+    const stored = Number(raw);
+    if (Number.isFinite(stored)) {
+      return stored >>> 0;
+    }
+  }
+  const derived = seedFromString(publicId);
+  writeSessionItem(SESSION_KEYS.seed, String(derived));
+  return derived;
 }
 
 export function readProgress(): Record<string, number> {
@@ -71,26 +134,24 @@ export function appendDelayChoice(choseDelayed: boolean): void {
 }
 
 export function isSessionComplete(): boolean {
-  return getSessionStorage()?.getItem(SESSION_KEYS.completed) === "1";
+  return readSessionItem(SESSION_KEYS.completed) === "1";
 }
 
 export function markSessionComplete(): void {
-  getSessionStorage()?.setItem(SESSION_KEYS.completed, "1");
+  writeSessionItem(SESSION_KEYS.completed, "1");
 }
 
 export function readSessionPoints(): number {
-  const points = Number(getSessionStorage()?.getItem(SESSION_KEYS.points) ?? "0");
+  const points = Number(readSessionItem(SESSION_KEYS.points) ?? "0");
   return Number.isFinite(points) ? points : 0;
 }
 
 export function writeSessionPoints(points: number): void {
-  getSessionStorage()?.setItem(SESSION_KEYS.points, String(points));
+  writeSessionItem(SESSION_KEYS.points, String(points));
 }
 
 export function clearExperimentSession(): void {
-  const storage = getSessionStorage();
-  if (!storage) return;
   for (const key of Object.values(SESSION_KEYS)) {
-    storage.removeItem(key);
+    removeBoth(key);
   }
 }

@@ -9,9 +9,12 @@ import {
   appendDelayChoice,
   isSessionComplete,
   markSessionComplete,
+  readPublicId,
   readSessionPoints,
+  readSessionSeed,
   recordTaskTrial,
   SESSION_KEYS,
+  writeSessionItem,
   writeSessionPoints,
 } from "@/lib/experiment/session-store";
 import type { TaskId } from "@/lib/types/database";
@@ -40,16 +43,15 @@ export function JsPsychWrapper() {
     if (started.current || !hostRef.current) return;
     started.current = true;
 
-    const publicId = sessionStorage.getItem(SESSION_KEYS.publicId) ?? "unknown";
-    const rawSeed = Number(sessionStorage.getItem(SESSION_KEYS.seed));
-    const seed = Number.isFinite(rawSeed) ? rawSeed : Date.now();
+    const publicId = readPublicId();
+    const seed = readSessionSeed(publicId);
     const session = createSessionState(publicId, seed, readSessionPoints());
     const queue = new TrialLogQueue();
     const host = hostRef.current;
     let cancelled = false;
 
     const recordQueueStatus = () => {
-      sessionStorage.setItem(SESSION_KEYS.failedLogs, String(queue.failures + queue.pending));
+      writeSessionItem(SESSION_KEYS.failedLogs, String(queue.failures + queue.pending));
     };
 
     const onLeave = (event: BeforeUnloadEvent) => {

@@ -9,7 +9,11 @@ import {
   EDUCATION_LABELS,
   EDUCATION_LEVELS,
 } from "@/lib/constants";
-import { clearExperimentSession, SESSION_KEYS } from "@/lib/experiment/session-store";
+import {
+  clearExperimentSession,
+  writeSessionIdentity,
+  writeSessionPoints,
+} from "@/lib/experiment/session-store";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -67,9 +71,8 @@ export function ConsentForm() {
       }
 
       clearExperimentSession();
-      sessionStorage.setItem(SESSION_KEYS.publicId, result.data.publicId);
-      sessionStorage.setItem(SESSION_KEYS.seed, String(result.data.seed));
-      sessionStorage.setItem(SESSION_KEYS.points, "0");
+      writeSessionIdentity(result.data.publicId, result.data.seed);
+      writeSessionPoints(0);
       router.push("/experiment");
     });
   }
