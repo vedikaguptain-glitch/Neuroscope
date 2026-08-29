@@ -54,3 +54,31 @@ body {
 body {
   min-height: 100dvh;
 }
+
+.landing-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.landing-shell::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background:
+    radial-gradient(circle at 12% 18%, rgba(45, 212, 191, 0.12), transparent 26rem),
+    radial-gradient(circle at 92% 85%, rgba(14, 116, 144, 0.1), transparent 28rem);
+  pointer-events: none;
+}
+
+.completion-shell {
+  position: relative;
+}
+
+.completion-shell::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: radial-gradient(circle at 50% 0%, rgba(45, 212, 191, 0.12), transparent 34rem);
+}

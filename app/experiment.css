@@ -215,6 +215,16 @@
 }
 
 @media (max-width: 700px) {
+  .ns-trial,
+  .jspsych-content {
+    padding: 72px 16px 48px;
+  }
+
+  .ns-prompt {
+    margin-bottom: 20px;
+    font-size: 1.15rem;
+  }
+
   .ns-options,
   .ns-wcst-options {
     grid-template-columns: 1fr;
@@ -222,5 +232,17 @@
 
   .ns-wcst-options {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ns-option,
+  .ns-card-btn,
+  .ns-submit,
+  .jspsych-btn {
+    min-height: 3.25rem;
+    padding: 18px 14px;
+  }
+
+  #jspsych-progressbar-outer {
+    width: 48%;
   }
 }

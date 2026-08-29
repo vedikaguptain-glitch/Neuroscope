@@ -13,9 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NEUROSCOPE",
-  description:
-    "A continuous behavioral experiment for learning general latent representations of human decision-making.",
+  title: "Choice Study",
+  description: "A student-led research activity exploring everyday decision-making.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
