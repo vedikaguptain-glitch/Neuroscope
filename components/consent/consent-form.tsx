@@ -23,7 +23,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
@@ -38,7 +37,6 @@ export function ConsentForm() {
   const [answers, setAnswers] = useState<Answers>(() =>
     Object.fromEntries(COMPREHENSION_ITEMS.map((item) => [item.id, null])),
   );
-  const [participantName, setParticipantName] = useState("");
   const [ageBracket, setAgeBracket] = useState("");
   const [educationLevel, setEducationLevel] = useState("");
   const [guardianConsent, setGuardianConsent] = useState(false);
@@ -57,7 +55,6 @@ export function ConsentForm() {
     setError(null);
     startTransition(async () => {
       const result = await createParticipant({
-        name: participantName.trim(),
         ageBracket,
         educationLevel,
         comprehensionPassed: true,
@@ -78,29 +75,28 @@ export function ConsentForm() {
   }
 
   return (
-    <Card className="border-border/80 bg-card/90 backdrop-blur">
-      <CardHeader>
-        <p className="text-xs uppercase tracking-[0.2em] text-primary">IRB consent</p>
-        <CardTitle>Participate in NEUROSCOPE</CardTitle>
+    <Card className="overflow-hidden border-border/70 bg-card/90 shadow-2xl shadow-black/20 backdrop-blur">
+      <CardHeader className="p-5 sm:p-6">
+        <p className="text-xs uppercase tracking-[0.2em] text-primary">Participation consent</p>
+        <CardTitle>Before you begin</CardTitle>
         <CardDescription>
-          A 40-minute continuous decision-making battery. Your data are stored
-          under an anonymous participant ID.
+          A roughly 30-minute sequence of choice-based activities. Your responses
+          are stored under a random participant ID, without your name.
         </CardDescription>
         <Progress value={progress} className="mt-3" />
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 p-5 pt-0 sm:p-6 sm:pt-0">
         {step === 0 ? (
           <div className="space-y-4 text-sm leading-6 text-muted-foreground">
             <p>
-              NEUROSCOPE learns a general latent representation of human
-              decision-making from behavioral sequences across probabilistic
-              learning, risk, delay, rule discovery, and social choice.
+              This school student-led study explores how people respond to a
+              variety of short decision challenges.
             </p>
             <ul className="list-disc space-y-2 pl-5">
-              <li>You will complete five modules without returning to a menu.</li>
-              <li>Every choice is logged immediately (state, action, reward, RT).</li>
+              <li>You will complete five activities in one continuous session.</li>
+              <li>Your choices and response times will be recorded for analysis.</li>
               <li>You may stop at any time by closing the browser.</li>
-              <li>Your name is stored with this session so researchers can identify your data.</li>
+              <li>We do not ask for or store your name.</li>
             </ul>
             <label className="flex items-start gap-3 text-foreground">
               <Checkbox
@@ -109,7 +105,7 @@ export function ConsentForm() {
               />
               <span>I understand the risks and agree to participate.</span>
             </label>
-            <Button disabled={!consentAccepted} onClick={() => setStep(1)}>
+            <Button className="w-full sm:w-auto" disabled={!consentAccepted} onClick={() => setStep(1)}>
               Continue
             </Button>
           </div>
@@ -123,7 +119,7 @@ export function ConsentForm() {
             {COMPREHENSION_ITEMS.map((item) => (
               <fieldset key={item.id} className="space-y-2">
                 <legend className="text-sm font-medium">{item.prompt}</legend>
-                <div className="flex gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:flex">
                   <Button
                     size="sm"
                     variant={answers[item.id] === true ? "default" : "outline"}
@@ -145,7 +141,7 @@ export function ConsentForm() {
                 </div>
               </fieldset>
             ))}
-            <div className="flex gap-3">
+            <div className="grid grid-cols-[auto_1fr] gap-3 sm:flex">
               <Button variant="ghost" onClick={() => setStep(0)}>
                 Back
               </Button>
@@ -158,17 +154,6 @@ export function ConsentForm() {
 
         {step === 2 ? (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="participant-name">What is your name?</Label>
-              <Input
-                id="participant-name"
-                autoComplete="name"
-                maxLength={100}
-                placeholder="Enter your full name"
-                value={participantName}
-                onChange={(event) => setParticipantName(event.target.value)}
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="age">What is your age?</Label>
               <NativeSelect
@@ -212,7 +197,7 @@ export function ConsentForm() {
             ) : null}
             <Separator />
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            <div className="flex gap-3">
+            <div className="grid grid-cols-[auto_1fr] gap-3 sm:flex">
               <Button variant="ghost" onClick={() => setStep(1)}>
                 Back
               </Button>
@@ -220,14 +205,13 @@ export function ConsentForm() {
                 size="lg"
                 disabled={
                   pending ||
-                  !participantName.trim() ||
                   !ageBracket ||
                   !educationLevel ||
                   (ageBracket === "13-17" && !guardianConsent)
                 }
                 onClick={submit}
               >
-                {pending ? "Creating session…" : "I Agree — begin"}
+                {pending ? "Creating session…" : "I agree — begin"}
               </Button>
             </div>
           </div>

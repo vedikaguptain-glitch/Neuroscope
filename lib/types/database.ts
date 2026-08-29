@@ -15,7 +15,6 @@ export type Json =
 export interface ParticipantRow {
   id: string;
   participant_id: string;
-  name: string;
   age_bracket: AgeBracket;
   education_level: EducationLevel;
   session_start_timestamp: string;
@@ -38,7 +37,6 @@ export interface TrialRow {
 export type ParticipantInsert = {
   id?: string;
   participant_id: string;
-  name: string;
   age_bracket: AgeBracket;
   education_level: EducationLevel;
   session_start_timestamp?: string;
