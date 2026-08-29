@@ -38,7 +38,7 @@ export const TASK_LABELS: Record<(typeof TASK_IDS)[number], string> = {
   prob_learning: "Probabilistic Learning",
   risk_pref: "Risk Preference",
   delay_disc: "Delay Discounting",
-  rule_discovery: "Rule Discovery",
+  rule_discovery: "Different Patterns: Discover the Rule That Connects Them",
   social_ultimatum: "Social Ultimatum",
 };
 
@@ -59,12 +59,12 @@ export const COMPREHENSION_ITEMS = [
   },
   {
     id: "anonymous",
-    prompt: "Your name is stored with this session, and each trial is tagged with a participant ID.",
+    prompt: "Your name is not collected, and your responses are linked only to a random participant ID.",
     correct: true,
   },
   {
     id: "duration",
-    prompt: "The full task battery takes about 40 minutes of continuous decision-making.",
+    prompt: "The activities take roughly 30 minutes and run as one continuous session.",
     correct: true,
   },
 ] as const;

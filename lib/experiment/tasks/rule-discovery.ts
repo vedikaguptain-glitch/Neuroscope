@@ -23,9 +23,9 @@ export function buildRuleDiscovery(
       {
         type: instructions,
         pages: [
-          `<h1>Module 4 · Rule Discovery</h1>
-           <p>Match the center card to one of the four corner cards. The matching rule is hidden.</p>
-           <p>The rule can shift without warning. Use the Correct / Incorrect feedback to rediscover it.</p>`,
+          `<h1>Module 4 · Different Patterns: Discover the Rule That Connects Them</h1>
+           <p>Match the center card to one of the four surrounding cards. Look for a shared pattern.</p>
+           <p>The pattern can change without warning, so use the feedback to discover the new connection.</p>`,
         ],
         show_clickable_nav: true,
         allow_backward: false,
@@ -44,7 +44,7 @@ export function buildRuleDiscovery(
         () => shouldRunTaskTrial("rule_discovery", i),
         {
           type: RuleMatchPlugin,
-          prompt: "Match the center card. The rule is hidden.",
+          prompt: "Which card follows the same hidden pattern as the center card?",
           hud_html: () => pointsHud(session.points),
           target,
           options: KEY_CARDS,

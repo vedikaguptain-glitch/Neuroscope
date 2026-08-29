@@ -16,7 +16,7 @@ export function buildRiskPreference(
   session: SessionState,
   random: () => number,
 ): ExperimentTimeline {
-  const n = trialCount(50, 6);
+  const n = trialCount(30, 6);
   const schedule = buildRiskSchedule(n, random, SAFE_AMOUNT);
 
   const trials: ExperimentTimeline = [

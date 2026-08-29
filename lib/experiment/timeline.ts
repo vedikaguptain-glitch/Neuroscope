@@ -26,14 +26,14 @@ export function buildBatteryTimeline(session: SessionState): ExperimentTimeline 
       {
         type: instructions,
         pages: [
-          `<h1>NEUROSCOPE</h1>
-           <p>You will complete five decision-making modules in one continuous session.</p>
-           <p>Stay on this page. Each module starts when the previous one ends.</p>
+          `<h1>Your activities are ready</h1>
+           <p>You will complete five short challenges in one continuous session.</p>
+           <p>Stay on this page. Each activity begins when the previous one ends.</p>
            <p class="ns-note">Participant ${session.publicId}</p>`,
         ],
         show_clickable_nav: true,
         allow_backward: false,
-        button_label_next: "Begin battery",
+        button_label_next: "Begin activities",
       },
     ),
     ...buildProbabilisticLearning(session, random),

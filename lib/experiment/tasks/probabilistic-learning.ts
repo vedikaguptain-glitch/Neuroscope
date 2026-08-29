@@ -33,7 +33,7 @@ export function buildProbabilisticLearning(
   session: SessionState,
   random: () => number,
 ): ExperimentTimeline {
-  const n = trialCount(100, 8);
+  const n = trialCount(60, 8);
   const schedule = buildProbLearningSchedule(n, random);
   const trials: ExperimentTimeline = [];
 
