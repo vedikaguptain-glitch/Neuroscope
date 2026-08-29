@@ -13,6 +13,7 @@ import {
   readSessionPoints,
   readSessionSeed,
   recordTaskTrial,
+  recordTrialSummary,
   SESSION_KEYS,
   writeSessionItem,
   writeSessionPoints,
@@ -49,6 +50,7 @@ export function JsPsychWrapper() {
     const queue = new TrialLogQueue();
     const host = hostRef.current;
     let cancelled = false;
+    let jsPsychInstance: ReturnType<typeof initJsPsych> | null = null;
 
     const recordQueueStatus = () => {
       writeSessionItem(SESSION_KEYS.failedLogs, String(queue.failures + queue.pending));
@@ -100,6 +102,7 @@ export function JsPsychWrapper() {
           if (!payload.action_taken) return;
           writeSessionPoints(session.points);
           recordTaskTrial(payload.task_id, payload.trial_index);
+          recordTrialSummary(payload);
           if (payload.task_id === "delay_disc") {
             appendDelayChoice(payload.action_taken === "delayed");
           }
@@ -107,6 +110,8 @@ export function JsPsychWrapper() {
         },
         on_finish: async () => {
           window.removeEventListener("beforeunload", onLeave);
+          jsPsychInstance = null;
+          if (cancelled) return;
           setStatus("Saving remaining trials…");
           writeSessionPoints(session.points);
           await queue.drain();
@@ -117,6 +122,7 @@ export function JsPsychWrapper() {
           router.replace("/complete");
         },
       });
+      jsPsychInstance = jsPsych;
 
       await jsPsych.run(buildBatteryTimeline(session) as never);
     })();
@@ -124,6 +130,7 @@ export function JsPsychWrapper() {
     return () => {
       cancelled = true;
       window.removeEventListener("beforeunload", onLeave);
+      jsPsychInstance?.abortExperiment();
     };
   }, [router]);
 
