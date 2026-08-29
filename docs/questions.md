@@ -1,8 +1,8 @@
-Here is the complete blueprint for the 40-minute continuous NEUROSCOPE module. This sequence is designed to maximize data extraction without inducing participant fatigue. The flow transitions seamlessly from one task to the next, keeping the participant in a steady state of decision-making.
+Here is the blueprint for the roughly 30-minute continuous NEUROSCOPE module. The flow transitions from one task to the next without returning to a menu.
 
 To ensure the $x_t = [S_t, A_t, R_t, \Delta t]$ sequence remains unbroken, Vansh can program the frontend to automatically chain these modules together without returning to a main menu, while Bhavya configures the database to tag every incoming row with the respective `task_id`.
 
-### The NEUROSCOPE Master Sequence (Estimated Time: 40 Minutes)
+### The NEUROSCOPE Master Sequence (Estimated Time: 30 Minutes)
 
 ---
 
@@ -21,12 +21,12 @@ To ensure the $x_t = [S_t, A_t, R_t, \Delta t]$ sequence remains unbroken, Vansh
 
 ### Module 1: Probabilistic Learning (0:03 - 0:11)
 
-* **Setup:** 100 rapid-fire trials. `task_id` = "prob_learning".
+* **Setup:** 60 rapid-fire trials. `task_id` = "prob_learning".
 * **The Scenario (State Vector $S_t$):** Two distinct abstract symbols (e.g., a blue fractal and a red fractal) appear on screen.
 * **The Question:** "Which symbol will give you a point?"
 * **The Mechanic:**
-* Trials 1–50: The blue symbol pays out 80% of the time (`prob_reward_a` = 0.8), and the red pays out 20% (`prob_reward_b` = 0.2).
-* Trials 51–100: The probabilities silently flip. Blue is now 20%, red is 80%. On trial 51, `volatility_reversal` is flagged `true`.
+* Trials 1–30: The blue symbol pays out 80% of the time (`prob_reward_a` = 0.8), and the red pays out 20% (`prob_reward_b` = 0.2).
+* Trials 31–60: The probabilities silently flip. Blue is now 20%, red is 80%. On trial 31, `volatility_reversal` is flagged `true`.
 
 
 * **Feedback ($R_t$):** A green "+1 Point" or a red "0 Points" appears immediately after the click.
@@ -35,7 +35,7 @@ To ensure the $x_t = [S_t, A_t, R_t, \Delta t]$ sequence remains unbroken, Vansh
 
 ### Module 2: Risk Preference (0:11 - 0:18)
 
-* **Setup:** 50 trials. `task_id` = "risk_pref".
+* **Setup:** 30 trials. `task_id` = "risk_pref".
 * **The Scenario (State Vector $S_t$):** A choice between a guaranteed safe harbor and a spinning wheel.
 * **The Question:** "Choose your payout for this round:"
 * Option A: "Guaranteed 50 Points"
@@ -61,7 +61,7 @@ To ensure the $x_t = [S_t, A_t, R_t, \Delta t]$ sequence remains unbroken, Vansh
 
 ---
 
-### Module 4: Rule Discovery (0:25 - 0:33)
+### Module 4: Different Patterns: Discover the Rule That Connects Them
 
 * **Setup:** 60 trials. `task_id` = "rule_discovery".
 * **The Scenario (State Vector $S_t$):** A target card appears in the center, with four base cards in the corners. Cards vary by Shape, Color, and Number of items.
@@ -91,6 +91,6 @@ To ensure the $x_t = [S_t, A_t, R_t, \Delta t]$ sequence remains unbroken, Vansh
 
 ### System Architecture Note
 
-Because every single click across these 300+ trials logs a unified $x_t$ tensor alongside the exact `reaction_time_ms` ($\Delta t$), the resulting dataset will be mathematically pristine for the Transformer model.
+Each click across the 240 trials logs the same core fields alongside `reaction_time_ms` ($\Delta t$), producing a consistent dataset for later analysis.
 
 Are you planning to randomize the order of these five modules for each participant to prevent fatigue from skewing the results of the final task, or will you keep the task sequence identical for everyone?

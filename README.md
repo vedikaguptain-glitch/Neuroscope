@@ -8,17 +8,17 @@ It is a research data-collection protocol for representation learning. **Not a t
 
 ## Result
 
-There is no held-out model score yet. The current result is a frozen 40-minute battery that writes one trial row immediately after every choice, without returning to a menu.
+There is no held-out model score yet. The current result is a roughly 30-minute battery that writes one trial row immediately after every choice, without returning to a menu.
 
 | Module | `task_id` | Full trials |
 |---|---|---:|
-| Probabilistic learning | `prob_learning` | 100 |
-| Risk preference | `risk_pref` | 50 |
+| Probabilistic learning | `prob_learning` | 60 |
+| Risk preference | `risk_pref` | 30 |
 | Delay discounting | `delay_disc` | 50 |
-| Rule discovery | `rule_discovery` | 60 |
+| Different patterns: discover the rule that connects them | `rule_discovery` | 60 |
 | Social ultimatum | `social_ultimatum` | 40 |
 
-That is 300 decision trials plus consent, comprehension, name, and demographics. `NEXT_PUBLIC_EXPERIMENT_MODE=demo` shortens each module for local testing and is not a scientific sample.
+That is 240 decision trials plus consent, comprehension, and demographics. `NEXT_PUBLIC_EXPERIMENT_MODE=demo` shortens each module for local testing and is not a scientific sample.
 
 The web client is INSERT-only. Researchers read `participants` and `trials` from Supabase with the service role. `/dashboard` is a reminder of that boundary, not a live results UI.
 
@@ -52,7 +52,7 @@ The contribution is a controlled collection design: consent and identity up fron
 
 5. **Collection is not representation learning.** Logging `x_t` does not prove that a useful latent exists. There is no embedding, no held-out participant evaluation, and no comparison against task-specific baselines.
 
-6. **The session is identified.** Participants enter a name before the battery. Trials are still keyed by a hashed `participant_id` and a signed cookie; name is stored on the session row so researchers can match people to data. This is not an anonymous public internet study.
+6. **The session is anonymous.** The app does not collect names. Trials are keyed by a hashed `participant_id` and a signed cookie so responses can remain grouped without identifying the participant.
 
 7. **Client-side progress is not the database of record.** Resume state lives in `sessionStorage`. Closing the browser ends the session. Failed inserts are counted on the complete screen, but the participant cannot repair them.
 
@@ -62,9 +62,9 @@ The contribution is a controlled collection design: consent and identity up fron
 
 **Target.** A continuous decision sequence suitable for later representation learning.
 
-**Session constraint.** Consent, comprehension, name, age bracket, and education are collected before the first trial. Ages 13–17 also require guardian consent.
+**Session constraint.** Consent, comprehension, age bracket, and education are collected before the first trial. Ages 13–17 also require guardian consent.
 
-**Tasks.** Full mode uses 100 / 50 / 50 / 60 / 40 trials in a fixed order: probabilistic learning, risk, delay, rule discovery, ultimatum. Stimuli that need randomness are seeded from the hashed participant id.
+**Tasks.** Full mode uses 60 / 30 / 50 / 60 / 40 trials in a fixed order: probabilistic learning, risk, delay, pattern discovery, ultimatum. Stimuli that need randomness are seeded from the hashed participant id.
 
 **Logging.** Each jsPsych trial calls `logTrial` with `state_vector`, `action_taken`, `reward_received`, `reaction_time_ms`, and `latent_variables`. The cookie binds the insert to the session that consent created.
 
@@ -75,7 +75,7 @@ The contribution is a controlled collection design: consent and identity up fron
 ## Limitations
 
 * No trained model or published latent-space metric exists in this repository.
-* Name, age bracket, and education are stored; this is identified research data.
+* Age bracket and education are stored, while names and direct identifiers are not collected.
 * INSERT-only RLS means the web app cannot show researchers their own tables.
 * `sessionStorage` resume does not survive a new browser profile or a cleared site.
 * Task order is fixed, so later modules can carry fatigue from earlier ones.
@@ -85,7 +85,7 @@ The contribution is a controlled collection design: consent and identity up fron
 
 The exhibit is the experiment itself:
 
-* `/` — IRB-style consent, comprehension, name, demographics.
+* `/` — consent, comprehension, and demographics.
 * `/experiment` — the five-module battery.
 * `/complete` — hashed participant id, session points, unsaved-trial count.
 * `/dashboard` — researcher boundary note, not a results console.
@@ -109,7 +109,7 @@ Fill in:
 * `SESSION_SECRET` (long random string used to sign the participant cookie)
 * `NEXT_PUBLIC_EXPERIMENT_MODE` — `full` (~40 min) or `demo` (short local testing)
 
-Create a Supabase project, then paste [`supabase/setup.sql`](supabase/setup.sql) into the SQL Editor and run it. That creates `participants` and `trials` with INSERT-only grants and RLS. If the project already has an older schema, run [`supabase/migrations/20260817163000_add_participant_name.sql`](supabase/migrations/20260817163000_add_participant_name.sql) so the `name` column exists.
+Create a Supabase project, then paste [`supabase/setup.sql`](supabase/setup.sql) into the SQL Editor and run it. That creates `participants` and `trials` with INSERT-only grants and RLS. Existing projects that collected names should run [`supabase/migrations/20260829090000_remove_participant_name.sql`](supabase/migrations/20260829090000_remove_participant_name.sql).
 
 Open [http://localhost:3000](http://localhost:3000). Consent → experiment → complete.
 
@@ -122,19 +122,19 @@ Never put the Supabase `service_role` key in `.env.local`.
 
 ## Outputs
 
-* `public.participants`: session row with hashed `participant_id`, `name`, `age_bracket`, `education_level`, `session_start_timestamp`, `comprehension_passed`.
+* `public.participants`: session row with hashed `participant_id`, `age_bracket`, `education_level`, `session_start_timestamp`, `comprehension_passed`.
 * `public.trials`: one `x_t` row per choice, tagged with `task_id` and `trial_index`.
 * Researchers inspect both tables in the Supabase Table Editor or SQL using the service role.
 
 ## Repository layout
 
 * [`app`](app): pages, layouts, and server actions.
-* [`components/consent`](components/consent): consent, comprehension, name, demographics.
+* [`components/consent`](components/consent): consent, comprehension, and demographics.
 * [`components/experiment`](components/experiment): jsPsych host and client session bootstrap.
 * [`lib/experiment`](lib/experiment): timelines, task logic, plugins, trial queue.
 * [`lib/supabase`](lib/supabase): browser and server clients.
 * [`supabase`](supabase): setup SQL and migrations.
-* [`docs/questions.md`](docs/questions.md): locked 40-minute protocol.
+* [`docs/questions.md`](docs/questions.md): protocol details.
 
 ## Acknowledgments and sources
 
