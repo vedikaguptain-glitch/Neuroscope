@@ -54,17 +54,17 @@ export function trialCount(full: number, demo = 4): number {
 export const COMPREHENSION_ITEMS = [
   {
     id: "voluntary",
-    prompt: "Participation is voluntary. You may stop at any time without penalty.",
+    prompt: "Can you stop participating at any time without a penalty?",
     correct: true,
   },
   {
     id: "anonymous",
-    prompt: "Your name is not collected, and your responses are linked only to a random participant ID.",
-    correct: true,
+    prompt: "Will we collect or store your name?",
+    correct: false,
   },
   {
     id: "duration",
-    prompt: "The activities take roughly 30 minutes and run as one continuous session.",
+    prompt: "Will the five activities run as one continuous session for roughly 30 minutes?",
     correct: true,
   },
 ] as const;

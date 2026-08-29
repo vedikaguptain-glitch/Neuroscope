@@ -114,7 +114,7 @@ export function ConsentForm() {
         {step === 1 ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Confirm each statement to show you understood the consent form.
+              Answer these quick questions about what you just read.
             </p>
             {COMPREHENSION_ITEMS.map((item) => (
               <fieldset key={item.id} className="space-y-2">
@@ -127,7 +127,7 @@ export function ConsentForm() {
                       setAnswers((current) => ({ ...current, [item.id]: true }))
                     }
                   >
-                    True
+                    Yes
                   </Button>
                   <Button
                     size="sm"
@@ -136,7 +136,7 @@ export function ConsentForm() {
                       setAnswers((current) => ({ ...current, [item.id]: false }))
                     }
                   >
-                    False
+                    No
                   </Button>
                 </div>
               </fieldset>
