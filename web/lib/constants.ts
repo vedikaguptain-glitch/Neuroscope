@@ -58,11 +58,6 @@ export const COMPREHENSION_ITEMS = [
     correct: true,
   },
   {
-    id: "anonymous",
-    prompt: "Will we collect or store your name?",
-    correct: false,
-  },
-  {
     id: "duration",
     prompt: "Will the five activities run as one continuous session for roughly 30 minutes?",
     correct: true,
