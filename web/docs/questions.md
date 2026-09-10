@@ -11,8 +11,8 @@ To ensure the $x_t = [S_t, A_t, R_t, \Delta t]$ sequence remains unbroken, Vansh
 * **The Interface:** A clean, distraction-free screen displaying the IRB consent form approved by Ms. Anant and the board.
 * **The Questions:**
 * "Do you understand the risks and agree to participate?" (Requires a strict 'Yes' click).
-* "What is your age?" (Dropdown: 13-17, 18-24, 25-34, etc.) -> Maps to `age_bracket`.
-* "What is your highest level of education?" (Dropdown: High School, Bachelor's, etc.) -> Maps to `education_level`.
+* "What is your age?" (Dropdown: 14, 15, 16, 17, or 18) -> Maps to `age`.
+* "Which class are you in?" (Dropdown: Class IX, X, XI, or XII) -> Maps to `school_class`.
 
 
 * **Database Trigger:** Generates the `participant_id` and logs the `session_start_timestamp`.

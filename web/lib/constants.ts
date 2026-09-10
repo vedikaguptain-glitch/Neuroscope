@@ -1,29 +1,12 @@
-export const AGE_BRACKETS = [
-  "13-17",
-  "18-24",
-  "25-34",
-  "35-44",
-  "45-54",
-  "55-64",
-  "65+",
-] as const;
+export const PARTICIPANT_AGES = [14, 15, 16, 17, 18] as const;
 
-export const EDUCATION_LEVELS = [
-  "high_school",
-  "some_college",
-  "bachelors",
-  "masters",
-  "doctoral",
-  "other",
-] as const;
+export const SCHOOL_CLASSES = [9, 10, 11, 12] as const;
 
-export const EDUCATION_LABELS: Record<(typeof EDUCATION_LEVELS)[number], string> = {
-  high_school: "High school or equivalent",
-  some_college: "Some college",
-  bachelors: "Bachelor's degree",
-  masters: "Master's degree",
-  doctoral: "Doctoral degree",
-  other: "Other",
+export const SCHOOL_CLASS_LABELS: Record<(typeof SCHOOL_CLASSES)[number], string> = {
+  9: "Class IX",
+  10: "Class X",
+  11: "Class XI",
+  12: "Class XII",
 };
 
 export const TASK_IDS = [

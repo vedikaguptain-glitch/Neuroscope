@@ -79,7 +79,7 @@ export default function CompletePage() {
           <CardDescription>
             {saved
               ? "Your responses were saved. This snapshot describes today’s choices and is not a personality or ability score."
-              : "The session finished, but some trial rows could not be saved. Please tell the researcher your anonymous ID."}
+              : "The session finished, but part of its database record could not be saved. Please tell the researcher your anonymous ID."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 p-5 pt-0 sm:p-8 sm:pt-0">
@@ -101,7 +101,7 @@ export default function CompletePage() {
           </section>
           {!saved ? (
             <p className="text-sm text-destructive">
-              Unsaved trials: {failedLogs}
+              Unsaved records: {failedLogs}
             </p>
           ) : null}
           <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">

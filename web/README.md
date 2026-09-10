@@ -10,7 +10,7 @@ The website keeps the study intentionally simple for participants:
 
 1. The landing page explains that this is a student-led research activity without exposing the project’s full analytical design.
 2. Participants accept the consent terms and answer short comprehension checks.
-3. Age bracket and education level are collected; names are not requested or stored.
+3. Exact age from 14 to 18 and school class from IX to XII are collected separately; names are not requested or stored.
 4. Five activities run as one continuous sequence without returning to a menu.
 5. The completion page shows points and session-specific statistics without making personality, ability, or clinical claims.
 
@@ -82,11 +82,11 @@ Open [http://localhost:3000](http://localhost:3000) after the development server
 
 Create a Supabase project and run [`supabase/setup.sql`](supabase/setup.sql) in the SQL editor. It creates the `participants` and `trials` tables, indexes, grants, and insert-only row-level security policies.
 
-For an existing database that previously stored participant names, apply [`supabase/migrations/20260829090000_remove_participant_name.sql`](supabase/migrations/20260829090000_remove_participant_name.sql).
+For an existing database, apply the migrations in date order. The exact-age migration stops if participant rows already exist because an age bracket cannot be converted into an exact age reliably.
 
 The primary outputs are:
 
-- `public.participants`, containing the anonymous session ID, demographics, start time, and comprehension status.
+- `public.participants`, containing the anonymous session ID, demographics, start and completion times, and comprehension status.
 - `public.trials`, containing one normalized row for every completed decision.
 
 ## Verification

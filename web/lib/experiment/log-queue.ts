@@ -11,7 +11,6 @@ function delay(ms: number) {
 export class TrialLogQueue {
   private queue: TrialLogPayload[] = [];
   private chain: Promise<void> = Promise.resolve();
-  private failed = 0;
 
   constructor() {
     const stored = readJson<TrialLogPayload[]>(SESSION_KEYS.logQueue, []);
@@ -25,10 +24,6 @@ export class TrialLogQueue {
 
   get pending(): number {
     return this.queue.length;
-  }
-
-  get failures(): number {
-    return this.failed;
   }
 
   enqueue(trial: TrialLogPayload) {
@@ -68,7 +63,6 @@ export class TrialLogQueue {
       }
 
       if (!success) {
-        this.failed += 1;
         return;
       }
 

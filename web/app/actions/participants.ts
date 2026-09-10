@@ -1,9 +1,10 @@
 "use server";
 
 import { z } from "zod";
-import { AGE_BRACKETS, EDUCATION_LEVELS } from "@/lib/constants";
+import { PARTICIPANT_AGES, SCHOOL_CLASSES } from "@/lib/constants";
 import {
   hashParticipantId,
+  readParticipantIdFromCookie,
   setParticipantCookie,
 } from "@/lib/session/participant-cookie";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -12,8 +13,14 @@ import { seedFromString } from "@/lib/experiment/rng";
 import type { ActionResult } from "@/lib/types/experiment";
 
 const createParticipantSchema = z.object({
-  ageBracket: z.enum(AGE_BRACKETS),
-  educationLevel: z.enum(EDUCATION_LEVELS),
+  age: z.number().refine(
+    (value): value is (typeof PARTICIPANT_AGES)[number] =>
+      PARTICIPANT_AGES.includes(value as (typeof PARTICIPANT_AGES)[number]),
+  ),
+  schoolClass: z.number().refine(
+    (value): value is (typeof SCHOOL_CLASSES)[number] =>
+      SCHOOL_CLASSES.includes(value as (typeof SCHOOL_CLASSES)[number]),
+  ),
   comprehensionPassed: z.literal(true),
   consentAccepted: z.literal(true),
   guardianConsent: z.boolean(),
@@ -27,10 +34,10 @@ export async function createParticipant(
     return { ok: false, error: "Please complete consent, comprehension, and demographics." };
   }
 
-  if (parsed.data.ageBracket === "13-17" && !parsed.data.guardianConsent) {
+  if (parsed.data.age < 18 && !parsed.data.guardianConsent) {
     return {
       ok: false,
-      error: "Participants aged 13–17 need a parent or guardian to consent.",
+      error: "Participants under 18 need permission from a parent or guardian.",
     };
   }
 
@@ -56,8 +63,8 @@ export async function createParticipant(
   const { error } = await supabase.from("participants").insert({
     id,
     participant_id: publicId,
-    age_bracket: parsed.data.ageBracket,
-    education_level: parsed.data.educationLevel,
+    age: parsed.data.age,
+    school_class: parsed.data.schoolClass,
     session_start_timestamp: sessionStart,
     comprehension_passed: true,
   });
@@ -80,4 +87,30 @@ export async function createParticipant(
       seed,
     },
   };
+}
+
+export async function completeParticipantSession(): Promise<ActionResult> {
+  const participantId = await readParticipantIdFromCookie();
+  if (!participantId) {
+    return { ok: false, error: "No active participant session." };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+
+  const { data, error } = await supabase.rpc("complete_participant_session", {
+    target_participant_id: participantId,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  if (data !== true) {
+    return { ok: false, error: "Could not find the active participant session." };
+  }
+
+  return { ok: true, data: undefined };
 }

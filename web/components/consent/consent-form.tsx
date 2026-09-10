@@ -4,10 +4,10 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createParticipant } from "@/app/actions/participants";
 import {
-  AGE_BRACKETS,
   COMPREHENSION_ITEMS,
-  EDUCATION_LABELS,
-  EDUCATION_LEVELS,
+  PARTICIPANT_AGES,
+  SCHOOL_CLASS_LABELS,
+  SCHOOL_CLASSES,
 } from "@/lib/constants";
 import {
   clearExperimentSession,
@@ -37,8 +37,8 @@ export function ConsentForm() {
   const [answers, setAnswers] = useState<Answers>(() =>
     Object.fromEntries(COMPREHENSION_ITEMS.map((item) => [item.id, null])),
   );
-  const [ageBracket, setAgeBracket] = useState("");
-  const [educationLevel, setEducationLevel] = useState("");
+  const [age, setAge] = useState("");
+  const [schoolClass, setSchoolClass] = useState("");
   const [guardianConsent, setGuardianConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -55,8 +55,8 @@ export function ConsentForm() {
     setError(null);
     startTransition(async () => {
       const result = await createParticipant({
-        ageBracket,
-        educationLevel,
+        age: Number(age),
+        schoolClass: Number(schoolClass),
         comprehensionPassed: true,
         consentAccepted: true,
         guardianConsent,
@@ -158,33 +158,33 @@ export function ConsentForm() {
               <Label htmlFor="age">What is your age?</Label>
               <NativeSelect
                 id="age"
-                value={ageBracket}
-                onChange={(event) => setAgeBracket(event.target.value)}
+                value={age}
+                onChange={(event) => setAge(event.target.value)}
               >
-                <option value="">Select age bracket</option>
-                {AGE_BRACKETS.map((bracket) => (
-                  <option key={bracket} value={bracket}>
-                    {bracket}
+                <option value="">Select age</option>
+                {PARTICIPANT_AGES.map((participantAge) => (
+                  <option key={participantAge} value={participantAge}>
+                    {participantAge}
                   </option>
                 ))}
               </NativeSelect>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="education">Highest level of education</Label>
+              <Label htmlFor="school-class">Which class are you in?</Label>
               <NativeSelect
-                id="education"
-                value={educationLevel}
-                onChange={(event) => setEducationLevel(event.target.value)}
+                id="school-class"
+                value={schoolClass}
+                onChange={(event) => setSchoolClass(event.target.value)}
               >
-                <option value="">Select education</option>
-                {EDUCATION_LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {EDUCATION_LABELS[level]}
+                <option value="">Select class</option>
+                {SCHOOL_CLASSES.map((classNumber) => (
+                  <option key={classNumber} value={classNumber}>
+                    {SCHOOL_CLASS_LABELS[classNumber]}
                   </option>
                 ))}
               </NativeSelect>
             </div>
-            {ageBracket === "13-17" ? (
+            {age !== "" && Number(age) < 18 ? (
               <label className="flex items-start gap-3 text-sm">
                 <Checkbox
                   checked={guardianConsent}
@@ -205,9 +205,9 @@ export function ConsentForm() {
                 size="lg"
                 disabled={
                   pending ||
-                  !ageBracket ||
-                  !educationLevel ||
-                  (ageBracket === "13-17" && !guardianConsent)
+                  !age ||
+                  !schoolClass ||
+                  (Number(age) < 18 && !guardianConsent)
                 }
                 onClick={submit}
               >

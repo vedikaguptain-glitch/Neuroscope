@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { initJsPsych } from "jspsych";
+import { completeParticipantSession } from "@/app/actions/participants";
 import { TrialLogQueue } from "@/lib/experiment/log-queue";
 import { buildBatteryTimeline, createSessionState } from "@/lib/experiment/timeline";
 import {
@@ -53,7 +54,17 @@ export function JsPsychWrapper() {
     let jsPsychInstance: ReturnType<typeof initJsPsych> | null = null;
 
     const recordQueueStatus = () => {
-      writeSessionItem(SESSION_KEYS.failedLogs, String(queue.failures + queue.pending));
+      writeSessionItem(SESSION_KEYS.failedLogs, String(queue.pending));
+    };
+
+    const saveCompletion = async () => {
+      const result = await completeParticipantSession();
+      if (!result.ok) {
+        writeSessionItem(SESSION_KEYS.failedLogs, "1");
+        return false;
+      }
+      markSessionComplete();
+      return true;
     };
 
     const onLeave = (event: BeforeUnloadEvent) => {
@@ -70,6 +81,7 @@ export function JsPsychWrapper() {
       if (cancelled) return;
 
       if (isSessionComplete() && queue.pending === 0) {
+        await saveCompletion();
         router.replace("/complete");
         return;
       }
@@ -117,7 +129,7 @@ export function JsPsychWrapper() {
           await queue.drain();
           recordQueueStatus();
           if (queue.pending === 0) {
-            markSessionComplete();
+            await saveCompletion();
           }
           router.replace("/complete");
         },

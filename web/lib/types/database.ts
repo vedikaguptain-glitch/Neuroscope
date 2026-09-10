@@ -1,7 +1,7 @@
-import type { AGE_BRACKETS, EDUCATION_LEVELS, TASK_IDS } from "@/lib/constants";
+import type { PARTICIPANT_AGES, SCHOOL_CLASSES, TASK_IDS } from "@/lib/constants";
 
-export type AgeBracket = (typeof AGE_BRACKETS)[number];
-export type EducationLevel = (typeof EDUCATION_LEVELS)[number];
+export type ParticipantAge = (typeof PARTICIPANT_AGES)[number];
+export type SchoolClass = (typeof SCHOOL_CLASSES)[number];
 export type TaskId = (typeof TASK_IDS)[number];
 
 export type Json =
@@ -15,9 +15,10 @@ export type Json =
 export interface ParticipantRow {
   id: string;
   participant_id: string;
-  age_bracket: AgeBracket;
-  education_level: EducationLevel;
+  age: ParticipantAge;
+  school_class: SchoolClass;
   session_start_timestamp: string;
+  session_completed_timestamp: string | null;
   comprehension_passed: boolean;
 }
 
@@ -37,9 +38,10 @@ export interface TrialRow {
 export type ParticipantInsert = {
   id?: string;
   participant_id: string;
-  age_bracket: AgeBracket;
-  education_level: EducationLevel;
+  age: ParticipantAge;
+  school_class: SchoolClass;
   session_start_timestamp?: string;
+  session_completed_timestamp?: string | null;
   comprehension_passed: boolean;
 };
 

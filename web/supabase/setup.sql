@@ -6,23 +6,13 @@ create extension if not exists pgcrypto;
 create table if not exists public.participants (
   id uuid primary key default gen_random_uuid(),
   participant_id text not null unique,
-  age_bracket text not null,
-  education_level text not null,
+  age smallint not null,
+  school_class smallint not null,
   session_start_timestamp timestamptz not null default now(),
+  session_completed_timestamp timestamptz,
   comprehension_passed boolean not null default false,
-  constraint participants_age_bracket_check
-    check (age_bracket in ('13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+')),
-  constraint participants_education_level_check
-    check (
-      education_level in (
-        'high_school',
-        'some_college',
-        'bachelors',
-        'masters',
-        'doctoral',
-        'other'
-      )
-    )
+  constraint participants_age_check check (age between 14 and 18),
+  constraint participants_school_class_check check (school_class between 9 and 12)
 );
 
 create table if not exists public.trials (
@@ -85,6 +75,24 @@ create policy "anon_insert_trials"
   for insert
   to anon, authenticated
   with check (true);
+
+create or replace function public.complete_participant_session(
+  target_participant_id uuid
+)
+returns boolean
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  update public.participants
+  set session_completed_timestamp = coalesce(session_completed_timestamp, now())
+  where id = target_participant_id
+  returning true;
+$$;
+
+revoke all on function public.complete_participant_session(uuid) from public;
+grant execute on function public.complete_participant_session(uuid)
+  to anon, authenticated, service_role;
 
 comment on table public.participants is
   'Anonymized experiment sessions. Web clients may INSERT only.';
