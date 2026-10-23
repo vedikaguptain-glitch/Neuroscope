@@ -5,13 +5,12 @@ from __future__ import annotations
 import os
 from collections.abc import Generator
 from contextlib import contextmanager
-from pathlib import Path
 
 import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extensions import connection as PgConnection
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+from ml.config import PROJECT_ROOT
 
 
 def load_database_url() -> str:
@@ -31,7 +30,18 @@ def load_database_url() -> str:
 @contextmanager
 def connect() -> Generator[PgConnection, None, None]:
     """Open a psycopg2 connection to the Supabase Postgres database."""
-    connection = psycopg2.connect(load_database_url())
+    connection = None
+    try:
+        connection = psycopg2.connect(
+            load_database_url(), connect_timeout=10, options="-c statement_timeout=120000"
+        )
+        connection.set_session(readonly=True)
+    except psycopg2.Error:
+        if connection is not None:
+            connection.close()
+        raise RuntimeError(
+            "Database connection failed. Check DATABASE_URL, credentials and network reachability."
+        ) from None
     try:
         yield connection
     finally:
