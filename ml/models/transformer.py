@@ -9,7 +9,7 @@ from torch import nn
 
 from ml.models.embeddings import BehavioralEmbedding
 from ml.utils.msm import MSMHeads, apply_msm_mask, msm_loss
-from ml.utils.preprocess import FeatureSpec
+from ml.utils.preprocess import FeatureSpec, feature_dimension
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -79,7 +79,7 @@ class BehavioralTransformer(nn.Module):
         action_vocab = spec["action_vocab"]
         if not isinstance(action_vocab, dict):
             raise TypeError("Feature spec must include action_vocab.")
-        reward_dim = len(spec["numeric_reward_keys"]) + len(spec["categorical_reward_keys"])
+        reward_dim = feature_dimension(spec, "reward")
         return cls(
             embedding=embedding,
             d_model=d_model,
@@ -128,6 +128,7 @@ class BehavioralTransformer(nn.Module):
         attention_mask: torch.Tensor | None = None,
         mask_prob: float = 0.15,
         generator: torch.Generator | None = None,
+        reward_observed: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, dict[str, torch.Tensor]]:
         """Run MSM: corrupt actions or rewards, then predict the hidden values."""
         if attention_mask is None:
@@ -159,6 +160,7 @@ class BehavioralTransformer(nn.Module):
             reward,
             corruption.action_mask,
             corruption.reward_mask,
+            self._move(reward_observed) if reward_observed is not None else None,
         )
         return hidden, loss, logs
 

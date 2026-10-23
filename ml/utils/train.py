@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
+import math
 from typing import Any
 
 import torch
@@ -20,10 +21,10 @@ from ml.models.transformer import (
     NUM_LAYERS,
     BehavioralTransformer,
 )
-from ml.utils.dataset import BehavioralSequenceDataset, make_dataloaders
-from ml.utils.db import PROJECT_ROOT
-
-CHECKPOINT_PATH = PROJECT_ROOT / "ml" / "models" / "neuroscope_msm.pt"
+from ml.utils.dataset import BehavioralSequenceDataset, make_dataloaders, split_indices
+from ml.config import CHECKPOINT_PATH as CHECKPOINT_PATH
+from ml.artifacts import atomic_path
+from ml.utils.preprocess import fit_feature_spec, load_raw_participants, preprocess_sessions
 
 
 def _mean_msm_loss(
@@ -50,7 +51,12 @@ def _mean_msm_loss(
             batch["delta_t"],
             batch["task_id"],
             batch["attention_mask"],
+            reward_observed=batch.get("reward_observed"),
         )
+        if not torch.isfinite(loss):
+            raise RuntimeError(
+                "Nonfinite masked-model loss; check input features and learning rate."
+            )
 
         if optimizer is not None:
             loss.backward()
@@ -80,22 +86,23 @@ def save_checkpoint(
     metrics: Mapping[str, float],
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "model_state": model.state_dict(),
-            "spec": dict(spec),
-            "epoch": epoch,
-            "metrics": dict(metrics),
-            "config": {
-                "d_model": D_MODEL,
-                "nhead": NHEAD,
-                "num_layers": NUM_LAYERS,
-                "dim_feedforward": DIM_FEEDFORWARD,
-                "dropout": DROPOUT,
+    with atomic_path(path) as temporary:
+        torch.save(
+            {
+                "model_state": model.state_dict(),
+                "spec": dict(spec),
+                "epoch": epoch,
+                "metrics": dict(metrics),
+                "config": {
+                    "d_model": D_MODEL,
+                    "nhead": NHEAD,
+                    "num_layers": NUM_LAYERS,
+                    "dim_feedforward": DIM_FEEDFORWARD,
+                    "dropout": DROPOUT,
+                },
             },
-        },
-        path,
-    )
+            temporary,
+        )
     return path
 
 
@@ -110,15 +117,28 @@ def run_training(
     max_grad_norm: float = 1.0,
     checkpoint_path: Path | None = None,
     dataset: BehavioralSequenceDataset | None = None,
+    raw_path: Path | None = None,
 ) -> Path:
     """Train with AdamW + cosine decay; write weights to ml/models/."""
+    if epochs < 1 or batch_size < 1 or not math.isfinite(lr) or lr <= 0:
+        raise RuntimeError("epochs, batch_size and lr must be positive.")
+    if not 0 < val_fraction < 1 or not math.isfinite(weight_decay) or weight_decay < 0:
+        raise RuntimeError(
+            "val_fraction must be between zero and one and weight_decay nonnegative."
+        )
+    if not math.isfinite(max_grad_norm) or max_grad_norm <= 0:
+        raise RuntimeError("max_grad_norm must be finite and positive.")
     torch.manual_seed(seed)
     destination = checkpoint_path or CHECKPOINT_PATH
-    data = dataset or BehavioralSequenceDataset.from_processed_file()
+    if dataset is None:
+        sessions = load_raw_participants(raw_path)
+        train_idx, _ = split_indices(len(sessions), val_fraction=val_fraction, seed=seed)
+        spec = fit_feature_spec([sessions[i] for i in train_idx])
+        data = BehavioralSequenceDataset.from_bundle(preprocess_sessions(sessions, spec))
+    else:
+        data = dataset
     if len(data) == 0:
-        raise RuntimeError(
-            "No processed sequences found. Run `python main.py --extract` first."
-        )
+        raise RuntimeError("No processed sequences found. Run `python main.py --extract` first.")
 
     train_loader, val_loader = make_dataloaders(
         data,
@@ -138,10 +158,19 @@ def run_training(
     for epoch in range(1, epochs + 1):
         train_metrics = _mean_msm_loss(model, train_loader, optimizer, max_grad_norm)
         if len(val_loader.dataset) > 0:
-            with torch.no_grad():
+            devices = [model.device.index or 0] if model.device.type == "cuda" else []
+            with torch.no_grad(), torch.random.fork_rng(devices=devices):
+                # Fixed validation corruptions make checkpoint comparisons meaningful
+                # without changing the training RNG stream.
+                torch.manual_seed(seed + 10000)
                 val_metrics = _mean_msm_loss(model, val_loader, None, max_grad_norm)
         else:
-            val_metrics = {"loss": train_metrics["loss"], "loss_action": 0.0, "loss_reward": 0.0, "n": 0.0}
+            val_metrics = {
+                "loss": train_metrics["loss"],
+                "loss_action": 0.0,
+                "loss_reward": 0.0,
+                "n": 0.0,
+            }
 
         scheduler.step()
         lr_now = scheduler.get_last_lr()[0]
@@ -165,6 +194,5 @@ def run_training(
             best_val = val_metrics["loss"]
             save_checkpoint(model, data.spec, destination, epoch, last_metrics)
 
-    save_checkpoint(model, data.spec, destination, epochs, last_metrics)
-    print(f"[train] saved weights to {destination}")
+    print(f"[train] saved best-validation weights to {destination} (val={best_val:.4f})")
     return destination

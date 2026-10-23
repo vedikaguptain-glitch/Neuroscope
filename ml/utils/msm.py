@@ -69,6 +69,7 @@ def msm_loss(
     reward_target: torch.Tensor,
     action_mask: torch.Tensor,
     reward_mask: torch.Tensor,
+    reward_observed: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     """Predict masked actions (cross-entropy) and masked rewards (MSE)."""
     loss = action_logits.new_zeros(())
@@ -91,9 +92,13 @@ def msm_loss(
         logs["loss_action"] = loss_action.detach()
 
     if reward_mask.any():
-        loss_reward = F.mse_loss(reward_pred[reward_mask], reward_target[reward_mask])
-        loss = loss + loss_reward
-        logs["loss_reward"] = loss_reward.detach()
+        observed = reward_mask.unsqueeze(-1).expand_as(reward_target)
+        if reward_observed is not None:
+            observed = observed & reward_observed.bool()
+        if observed.any():
+            loss_reward = F.mse_loss(reward_pred[observed], reward_target[observed])
+            loss = loss + loss_reward
+            logs["loss_reward"] = loss_reward.detach()
 
     logs["loss"] = loss.detach()
     return loss, logs

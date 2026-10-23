@@ -19,6 +19,7 @@ from ml.utils.preprocess import (
     load_raw_participants,
     preprocess_raw_participants,
     preprocess_sessions,
+    feature_dimension,
 )
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -37,6 +38,7 @@ class BehavioralSequenceDataset(Dataset[dict[str, Any]]):
         x: torch.Tensor,
         participant_ids: Sequence[str],
         spec: FeatureSpec,
+        reward_observed: torch.Tensor | None = None,
     ) -> None:
         if x.ndim != 3 or x.shape[1] != SEQUENCE_LENGTH:
             raise ValueError(
@@ -57,6 +59,34 @@ class BehavioralSequenceDataset(Dataset[dict[str, Any]]):
         self.state = state.cpu()
         self.action = action.cpu()
         self.reward = reward.cpu()
+        self.reward_observed = (
+            reward_observed.cpu() if reward_observed is not None else torch.ones_like(self.reward)
+        )
+        expected_shapes = {
+            "state": (n, SEQUENCE_LENGTH, feature_dimension(spec, "state")),
+            "reward": (n, SEQUENCE_LENGTH, feature_dimension(spec, "reward")),
+            "action": (n, SEQUENCE_LENGTH),
+            "task_id": (n, SEQUENCE_LENGTH),
+            "delta_t": (n, SEQUENCE_LENGTH, 1),
+        }
+        for name, shape in expected_shapes.items():
+            tensor = {
+                "state": state,
+                "reward": reward,
+                "action": action,
+                "task_id": task_id,
+                "delta_t": delta_t,
+            }[name]
+            if tuple(tensor.shape) != shape or not torch.isfinite(tensor).all():
+                raise ValueError(f"Invalid {name} tensor shape or nonfinite values.")
+        if tuple(self.reward_observed.shape) != tuple(reward.shape) or not torch.all(
+            (self.reward_observed == 0) | (self.reward_observed == 1)
+        ):
+            raise ValueError("Reward-observed mask must be binary and match reward shape.")
+        if action.dtype != torch.long or task_id.dtype != torch.long:
+            raise ValueError("Action and task tokens must have dtype torch.long.")
+        if len(set(participant_ids)) != n:
+            raise ValueError("Dataset participant IDs must be distinct.")
         self.delta_t = delta_t.cpu()
         self.task_id = task_id.cpu()
         self.x = x.cpu()
@@ -74,6 +104,7 @@ class BehavioralSequenceDataset(Dataset[dict[str, Any]]):
             "state": self.state[index],
             "action": self.action[index],
             "reward": self.reward[index],
+            "reward_observed": self.reward_observed[index],
             "delta_t": self.delta_t[index],
             "task_id": self.task_id[index],
             "x": self.x[index],
@@ -94,6 +125,7 @@ class BehavioralSequenceDataset(Dataset[dict[str, Any]]):
             x=bundle["x"],
             participant_ids=bundle["participant_ids"],
             spec=spec,
+            reward_observed=bundle.get("reward_observed"),
         )
 
     @classmethod
@@ -109,7 +141,7 @@ class BehavioralSequenceDataset(Dataset[dict[str, Any]]):
             return cls.from_bundle(bundle)
 
         payload = torch.load(source, map_location="cpu", weights_only=False)
-        if VOCAB_PATH.exists():
+        if "spec" not in payload and VOCAB_PATH.exists():
             import json
 
             payload["spec"] = json.loads(VOCAB_PATH.read_text(encoding="utf-8"))

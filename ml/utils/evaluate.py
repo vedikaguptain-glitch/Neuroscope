@@ -15,7 +15,12 @@ from sklearn.preprocessing import StandardScaler
 import torch
 
 from ml.utils.dataset import BehavioralSequenceDataset
-from ml.utils.infer import extract_hidden_states, load_trained_model, pool_hidden_states
+from ml.utils.infer import (
+    dataset_for_checkpoint,
+    extract_hidden_states,
+    load_trained_model,
+    pool_hidden_states,
+)
 from ml.utils.preprocess import TASK_ORDER, Vocab
 
 HELD_OUT_DEFAULT = "risk_pref"
@@ -31,9 +36,7 @@ def _task_token_id(spec: Mapping[str, Any], task_name: str) -> int:
     if not isinstance(task_vocab, dict):
         raise TypeError("Feature spec is missing task_vocab.")
     if task_name not in task_vocab:
-        raise RuntimeError(
-            f"Unknown task '{task_name}'. Expected one of: {', '.join(TASK_ORDER)}."
-        )
+        raise RuntimeError(f"Unknown task '{task_name}'. Expected one of: {', '.join(TASK_ORDER)}.")
     return Vocab.from_dict(task_vocab).encode(task_name)
 
 
@@ -75,7 +78,7 @@ def _probe_split(
     features: np.ndarray,
     labels: np.ndarray,
     seed: int,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     n = features.shape[0]
     unique, counts = np.unique(labels, return_counts=True)
     if unique.size < 2:
@@ -102,14 +105,16 @@ def _probe_split(
     if n < 6 or int(counts.min()) < 2:
         loo = LeaveOneOut()
         preds = np.zeros_like(labels)
+        baseline_preds = np.zeros_like(labels)
         for train_idx, test_idx in loo.split(features):
+            majority = int(np.bincount(labels[train_idx]).argmax())
+            baseline_preds[test_idx] = majority
             if np.unique(labels[train_idx]).size < 2:
-                majority = int(np.bincount(labels[train_idx]).argmax())
                 preds[test_idx] = majority
                 continue
             pipeline.fit(features[train_idx], labels[train_idx])
             preds[test_idx] = pipeline.predict(features[test_idx])
-        return labels, preds
+        return labels, preds, baseline_preds
 
     stratify = labels if int(counts.min()) >= 2 else None
     x_train, x_test, y_train, y_test = train_test_split(
@@ -120,7 +125,8 @@ def _probe_split(
         stratify=stratify,
     )
     pipeline.fit(x_train, y_train)
-    return y_test, pipeline.predict(x_test)
+    majority = int(np.bincount(y_train).argmax())
+    return y_test, pipeline.predict(x_test), np.full_like(y_test, majority)
 
 
 def run_evaluation(
@@ -129,10 +135,14 @@ def run_evaluation(
     seed: int = 42,
     dataset: BehavioralSequenceDataset | None = None,
     checkpoint_path: Path | None = None,
+    raw_path: Path | None = None,
 ) -> dict[str, Any]:
     """Probe frozen embeddings (excluding the held-out task) to predict that task's behavior."""
     model = load_trained_model(checkpoint_path)
-    data = dataset or BehavioralSequenceDataset.from_processed_file()
+    print(
+        "[probe] Exploratory pretrained-embedding probe; use --evaluate for participant-separated model selection."
+    )
+    data = dataset if dataset is not None else dataset_for_checkpoint(checkpoint_path, raw_path)
     if len(data) == 0:
         raise RuntimeError("No processed sequences found. Run `python main.py --extract` first.")
 
@@ -177,11 +187,11 @@ def run_evaluation(
     if labels.size == 0:
         raise RuntimeError(f"No {held_out_task} trials found to build probe labels.")
 
-    y_true, y_pred = _probe_split(features, labels, seed)
-    majority = int(np.bincount(labels).argmax())
-    baseline = float((y_true == majority).mean()) if y_true.size else 0.0
+    y_true, y_pred, baseline_pred = _probe_split(features, labels, seed)
+    baseline = float((y_true == baseline_pred).mean()) if y_true.size else 0.0
     metrics = {
         "held_out_task": held_out_task,
+        "protocol": "exploratory pretrained-embedding probe; encoder participants are not an independent test cohort",
         "n_participants": int(labels.size),
         "n_eval": int(y_true.size),
         "accuracy": float(accuracy_score(y_true, y_pred)),

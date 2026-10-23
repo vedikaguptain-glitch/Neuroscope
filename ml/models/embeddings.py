@@ -8,7 +8,7 @@ from collections.abc import Mapping
 import torch
 from torch import nn
 
-from ml.utils.preprocess import SEQUENCE_LENGTH, FeatureSpec
+from ml.utils.preprocess import SEQUENCE_LENGTH, FeatureSpec, feature_dimension
 
 
 class AbsolutePositionalEncoding(nn.Module):
@@ -72,8 +72,8 @@ class BehavioralEmbedding(nn.Module):
         d_model: int = 128,
         dropout: float = 0.1,
     ) -> BehavioralEmbedding:
-        state_dim = len(spec["numeric_state_keys"]) + len(spec["categorical_state_keys"])
-        reward_dim = len(spec["numeric_reward_keys"]) + len(spec["categorical_reward_keys"])
+        state_dim = feature_dimension(spec, "state")
+        reward_dim = feature_dimension(spec, "reward")
         action_vocab = spec["action_vocab"]
         task_vocab = spec["task_vocab"]
         if not isinstance(action_vocab, dict) or not isinstance(task_vocab, dict):

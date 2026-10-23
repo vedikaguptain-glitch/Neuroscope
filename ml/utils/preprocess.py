@@ -1,31 +1,20 @@
-"""Parse raw sessions into x_t = [S_t, A_t, R_t, Δt] tensors."""
+"""Parse raw sessions into x_t = [S_t, A_t, R_t, Î”t] tensors."""
 
 from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, NotRequired, TypedDict, cast
 
 import numpy as np
 import torch
 
-from ml.utils.db import PROJECT_ROOT
-from ml.utils.extract import RAW_PARTICIPANTS_PATH
+from ml.config import RAW_PARTICIPANTS_PATH, PROCESSED_PATH, VOCAB_PATH, SEQUENCE_LENGTH, TASK_ORDER
+from ml.records import load_raw_participants
 
-SEQUENCE_LENGTH = 240
 PAD_TOKEN = "<pad>"
 UNK_TOKEN = "<unk>"
-TASK_ORDER = (
-    "prob_learning",
-    "risk_pref",
-    "delay_disc",
-    "rule_discovery",
-    "social_ultimatum",
-)
-
-PROCESSED_PATH = PROJECT_ROOT / "ml" / "data" / "processed.pt"
-VOCAB_PATH = PROJECT_ROOT / "ml" / "data" / "vocab.json"
 
 
 class Vocab:
@@ -56,6 +45,8 @@ class Vocab:
 
 
 class FeatureSpec(TypedDict):
+    version: NotRequired[int]
+    numeric_scalers: NotRequired[dict[str, dict[str, list[float]]]]
     numeric_state_keys: list[str]
     categorical_state_keys: list[str]
     numeric_reward_keys: list[str]
@@ -66,18 +57,6 @@ class FeatureSpec(TypedDict):
     task_vocab: dict[str, int]
     state_cat_vocabs: dict[str, dict[str, int]]
     reward_cat_vocabs: dict[str, dict[str, int]]
-
-
-def load_raw_participants(path: Path | None = None) -> list[dict[str, Any]]:
-    source = path or RAW_PARTICIPANTS_PATH
-    if not source.exists():
-        raise RuntimeError(
-            f"Raw data not found at {source}. Run `python main.py --extract` first."
-        )
-    payload = json.loads(source.read_text(encoding="utf-8"))
-    if not isinstance(payload, list):
-        raise RuntimeError("raw_participants.json must contain a JSON array.")
-    return payload
 
 
 def _as_mapping(value: Any) -> dict[str, Any]:
@@ -205,7 +184,26 @@ def fit_feature_spec(sessions: Sequence[Mapping[str, Any]]) -> FeatureSpec:
     if rt_std < 1e-8:
         rt_std = 1.0
 
+    scalers: dict[str, dict[str, list[float]]] = {}
+    for kind, keys in (("state", numeric_state_keys), ("reward", numeric_reward_keys)):
+        values: dict[str, list[float]] = {key: [] for key in keys}
+        for session in sessions:
+            for trial in session.get("trials") or []:
+                numeric, _ = _split_leaves(
+                    trial.get("state_vector" if kind == "state" else "reward_received")
+                )
+                for key, number in numeric.items():
+                    if key in values:
+                        values[key].append(number)
+        scalers[kind] = {
+            key: [float(np.mean(numbers)), max(float(np.std(numbers)), 1e-6)]
+            for key, numbers in values.items()
+            if numbers
+        }
+
     return FeatureSpec(
+        version=2,
+        numeric_scalers=scalers,
         numeric_state_keys=sorted(numeric_state_keys),
         categorical_state_keys=sorted(categorical_state_keys),
         numeric_reward_keys=sorted(numeric_reward_keys),
@@ -215,8 +213,7 @@ def fit_feature_spec(sessions: Sequence[Mapping[str, Any]]) -> FeatureSpec:
         action_vocab=Vocab(sorted(actions)).to_dict(),
         task_vocab=Vocab(TASK_ORDER).to_dict(),
         state_cat_vocabs={
-            key: Vocab(sorted(values)).to_dict()
-            for key, values in sorted(state_cat_values.items())
+            key: Vocab(sorted(values)).to_dict() for key, values in sorted(state_cat_values.items())
         },
         reward_cat_vocabs={
             key: Vocab(sorted(values)).to_dict()
@@ -231,13 +228,42 @@ def _vectorize(
     numeric_keys: Sequence[str],
     categorical_keys: Sequence[str],
     cat_vocabs: Mapping[str, Vocab],
+    scalers: Mapping[str, Sequence[float]] | None = None,
+    one_hot: bool = False,
+    presence: bool = False,
 ) -> list[float]:
-    values = [float(numeric.get(key, 0.0)) for key in numeric_keys]
+    values = []
+    for key in numeric_keys:
+        if key not in numeric:
+            values.append(0.0)
+        elif scalers is not None:
+            mean, std = scalers.get(key, (0.0, 1.0))
+            values.append(float(np.clip((numeric[key] - mean) / std, -10, 10)))
+        else:
+            values.append(float(numeric[key]))
+    if presence:
+        values.extend(float(key in numeric) for key in numeric_keys)
     for key in categorical_keys:
         vocab = cat_vocabs.get(key)
         token = categorical.get(key)
-        values.append(float(vocab.encode(token) if vocab is not None else 0))
+        encoded = vocab.encode(token) if vocab is not None else 0
+        if one_hot and vocab is not None:
+            values.extend(
+                float(index == encoded and token is not None)
+                for index in range(len(vocab.token_to_id))
+            )
+        else:
+            values.append(float(encoded))
     return values
+
+
+def feature_dimension(spec: Mapping[str, Any], kind: str) -> int:
+    numeric = len(spec[f"numeric_{kind}_keys"])
+    if spec.get("version", 1) < 2:
+        return numeric + len(spec[f"categorical_{kind}_keys"])
+    return numeric * (2 if kind == "state" else 1) + sum(
+        len(spec[f"{kind}_cat_vocabs"][key]) for key in spec[f"categorical_{kind}_keys"]
+    )
 
 
 def normalize_reaction_time(rt_ms: Any, spec: FeatureSpec) -> float:
@@ -258,12 +284,17 @@ def trial_to_xt(
 ) -> tuple[list[float], int, list[float], float, int]:
     state_num, state_cat = _split_leaves(trial.get("state_vector"))
     reward_num, reward_cat = _split_leaves(trial.get("reward_received"))
+    v2 = spec.get("version", 1) >= 2
+    scalers = spec.get("numeric_scalers", {})
     state = _vectorize(
         state_num,
         state_cat,
         spec["numeric_state_keys"],
         spec["categorical_state_keys"],
         state_cat_vocabs,
+        scalers=scalers.get("state") if v2 else None,
+        one_hot=v2,
+        presence=v2,
     )
     reward = _vectorize(
         reward_num,
@@ -271,6 +302,8 @@ def trial_to_xt(
         spec["numeric_reward_keys"],
         spec["categorical_reward_keys"],
         reward_cat_vocabs,
+        scalers=scalers.get("reward") if v2 else None,
+        one_hot=v2,
     )
     action_id = action_vocab.encode(
         trial.get("action_taken") if isinstance(trial.get("action_taken"), str) else None
@@ -313,8 +346,16 @@ def session_to_tensors(
         for trial in trials
     ]
 
-    state_dim = len(spec["numeric_state_keys"]) + len(spec["categorical_state_keys"])
-    reward_dim = len(spec["numeric_reward_keys"]) + len(spec["categorical_reward_keys"])
+    state_dim = feature_dimension(spec, "state")
+    reward_dim = feature_dimension(spec, "reward")
+    observed = []
+    for trial in trials:
+        numeric, categorical = _split_leaves(trial.get("reward_received"))
+        row = [float(key in numeric) for key in spec["numeric_reward_keys"]]
+        for key in spec["categorical_reward_keys"]:
+            size = len(spec["reward_cat_vocabs"][key]) if spec.get("version", 1) >= 2 else 1
+            row.extend([float(key in categorical)] * size)
+        observed.append(row)
     zero_state = [0.0] * state_dim
     zero_reward = [0.0] * reward_dim
     pad_action = action_vocab.encode(None)
@@ -346,6 +387,7 @@ def session_to_tensors(
         "state": state_tensor,
         "action": action_tensor,
         "reward": reward_tensor,
+        "reward_observed": torch.tensor(_pad_or_trim(observed, zero_reward), dtype=torch.float32),
         "delta_t": delta_tensor,
         "task_id": task_tensor,
         "x": x_t,
@@ -362,6 +404,7 @@ def preprocess_sessions(
         "state": [],
         "action": [],
         "reward": [],
+        "reward_observed": [],
         "delta_t": [],
         "task_id": [],
         "x": [],
@@ -374,34 +417,44 @@ def preprocess_sessions(
             packed[key].append(tensor)
 
     stacked = {
-        key: torch.stack(values) if values else torch.empty(0)
-        for key, values in packed.items()
+        key: torch.stack(values) if values else torch.empty(0) for key, values in packed.items()
     }
     stacked["participant_ids"] = participant_ids
     stacked["spec"] = fitted
     return stacked
 
 
-def save_preprocessor_artifacts(bundle: Mapping[str, Any]) -> tuple[Path, Path]:
+def save_preprocessor_artifacts(
+    bundle: Mapping[str, Any], output_dir: Path | None = None
+) -> tuple[Path, Path]:
     spec = cast(FeatureSpec, bundle["spec"])
-    VOCAB_PATH.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
-    torch.save(
-        {
-            "participant_ids": bundle["participant_ids"],
-            "state": bundle["state"],
-            "action": bundle["action"],
-            "reward": bundle["reward"],
-            "delta_t": bundle["delta_t"],
-            "task_id": bundle["task_id"],
-            "x": bundle["x"],
-        },
-        PROCESSED_PATH,
-    )
-    return PROCESSED_PATH, VOCAB_PATH
+    from ml.artifacts import atomic_path, write_json
+
+    vocab_path = output_dir / "vocab.json" if output_dir else VOCAB_PATH
+    processed_path = output_dir / "processed.pt" if output_dir else PROCESSED_PATH
+    write_json(vocab_path, spec)
+    with atomic_path(processed_path) as temporary:
+        torch.save(
+            {
+                "spec": dict(spec),
+                "participant_ids": bundle["participant_ids"],
+                "state": bundle["state"],
+                "action": bundle["action"],
+                "reward": bundle["reward"],
+                "reward_observed": bundle["reward_observed"],
+                "delta_t": bundle["delta_t"],
+                "task_id": bundle["task_id"],
+                "x": bundle["x"],
+            },
+            temporary,
+        )
+    return processed_path, vocab_path
 
 
-def preprocess_raw_participants(raw_path: Path | None = None) -> dict[str, Any]:
+def preprocess_raw_participants(
+    raw_path: Path | None = None, output_dir: Path | None = None
+) -> dict[str, Any]:
     sessions = load_raw_participants(raw_path)
     bundle = preprocess_sessions(sessions)
-    save_preprocessor_artifacts(bundle)
+    save_preprocessor_artifacts(bundle, output_dir=output_dir)
     return bundle

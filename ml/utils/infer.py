@@ -10,19 +10,32 @@ from torch.utils.data import DataLoader
 
 from ml.models.transformer import BehavioralTransformer
 from ml.utils.dataset import BehavioralSequenceDataset, DEVICE
-from ml.utils.db import PROJECT_ROOT
-from ml.utils.train import CHECKPOINT_PATH
+from ml.config import CHECKPOINT_PATH, PROJECT_ROOT
+from ml.artifacts import atomic_path
+from ml.utils.preprocess import load_raw_participants, preprocess_sessions
 
 EMBEDDINGS_PATH = PROJECT_ROOT / "ml" / "data" / "embeddings.pt"
+
+
+def dataset_for_checkpoint(
+    checkpoint_path: Path | None = None, raw_path: Path | None = None
+) -> BehavioralSequenceDataset:
+    """Re-encode raw sessions with the checkpoint's fitted feature mappings."""
+    source = checkpoint_path or CHECKPOINT_PATH
+    payload = torch.load(source, map_location="cpu", weights_only=False)
+    spec = payload.get("spec")
+    if not isinstance(spec, dict):
+        raise RuntimeError("Checkpoint is missing the preprocessing spec.")
+    return BehavioralSequenceDataset.from_bundle(
+        preprocess_sessions(load_raw_participants(raw_path), spec)
+    )
 
 
 def load_trained_model(checkpoint_path: Path | None = None) -> BehavioralTransformer:
     """Load a BehavioralTransformer and its MSM heads from a training checkpoint."""
     source = checkpoint_path or CHECKPOINT_PATH
     if not source.exists():
-        raise RuntimeError(
-            f"No trained weights at {source}. Run `python main.py --train` first."
-        )
+        raise RuntimeError(f"No trained weights at {source}. Run `python main.py --train` first.")
     payload = torch.load(source, map_location="cpu", weights_only=False)
     spec = payload.get("spec")
     if not isinstance(spec, dict):
@@ -133,8 +146,9 @@ def extract_and_save_embeddings(
     """Load trained weights, embed every session, and write ml/data/embeddings.pt."""
     destination = output_path or EMBEDDINGS_PATH
     model = load_trained_model(checkpoint_path)
-    data = dataset or BehavioralSequenceDataset.from_processed_file()
+    data = dataset if dataset is not None else dataset_for_checkpoint(checkpoint_path)
     bundle = extract_dataset_embeddings(model, data, batch_size=batch_size)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(bundle, destination)
+    with atomic_path(destination) as temporary:
+        torch.save(bundle, temporary)
     return destination
