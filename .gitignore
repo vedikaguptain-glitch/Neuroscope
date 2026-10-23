@@ -5,9 +5,12 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 
 .env
 .env.local
+.env.*
+!.env.example
 *.pem
 
 ml/data/*.json
@@ -15,5 +18,8 @@ ml/data/*.pt
 ml/models/*.pt
 ml/models/*.pth
 ml/models/*.bin
+ml/models/*.joblib
+ml/data/optimization_*/
+ml/data/conditional_risk_policy/
 
 .DS_Store

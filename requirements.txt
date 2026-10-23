@@ -1,7 +1,8 @@
-torch
-transformers
-psycopg2-binary
-python-dotenv
-pandas
-numpy
-scikit-learn
+torch>=2.6,<3
+psycopg2-binary>=2.9,<3
+python-dotenv>=1,<2
+numpy>=2,<3
+scikit-learn>=1.5,<2
+joblib>=1.4,<2
+threadpoolctl>=3,<4
+scipy>=1.14,<2
